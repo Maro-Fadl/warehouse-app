@@ -1,49 +1,87 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Sphere, Torus, OrbitControls } from '@react-three/drei';
+import { Float, MeshDistortMaterial, Sphere, OrbitControls, Text3D, Center } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from 'next-themes';
 
-function FloatingWarehouse({ position }: { position: [number, number, number] }) {
+function FloatingWarehouse({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   useFrame((state) => {
     if (meshRef.current) {
       meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.1;
       meshRef.current.rotation.y += 0.005;
+      meshRef.current.scale.lerp(
+        new THREE.Vector3(hovered ? 1.2 * scale : scale, hovered ? 1.2 * scale : scale, hovered ? 1.2 * scale : scale),
+        0.1
+      );
     }
   });
 
   return (
     <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-      <mesh ref={meshRef} position={position}>
-        <boxGeometry args={[1, 0.6, 1.5]} />
+      <mesh
+        ref={meshRef}
+        position={position}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        <boxGeometry args={[1.2, 0.7, 1.6]} />
         <MeshDistortMaterial
-          color="#3b82f6"
+          color={hovered ? '#60a5fa' : '#3b82f6'}
           speed={2}
-          distort={0.2}
+          distort={hovered ? 0.3 : 0.2}
           roughness={0.3}
           metalness={0.8}
         />
+        {/* Door */}
+        <mesh position={[0, -0.1, 0.81]}>
+          <boxGeometry args={[0.4, 0.5, 0.01]} />
+          <meshStandardMaterial color="#1e40af" metalness={0.5} roughness={0.5} />
+        </mesh>
+        {/* Windows */}
+        {[-0.3, 0.3].map((x, i) => (
+          <mesh key={i} position={[x, 0.15, 0.81]}>
+            <boxGeometry args={[0.15, 0.15, 0.01]} />
+            <meshStandardMaterial color="#93c5fd" metalness={0.8} roughness={0.2} />
+          </mesh>
+        ))}
       </mesh>
     </Float>
   );
 }
 
 function ParticleField() {
-  const count = 200;
+  const count = 300;
   const particles = useRef<THREE.Points>(null);
 
   const positions = useMemo(() => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 20;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 20;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 20;
+      pos[i * 3] = (Math.random() - 0.5) * 25;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 25;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 25;
     }
     return pos;
+  }, []);
+
+  const colors = useMemo(() => {
+    const cols = new Float32Array(count * 3);
+    const palette = [
+      [0.37, 0.51, 0.96], // blue
+      [0.55, 0.36, 0.96], // purple
+      [0.02, 0.71, 0.83], // cyan
+    ];
+    for (let i = 0; i < count; i++) {
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      cols[i * 3] = color[0];
+      cols[i * 3 + 1] = color[1];
+      cols[i * 3 + 2] = color[2];
+    }
+    return cols;
   }, []);
 
   useFrame((state) => {
@@ -62,12 +100,18 @@ function ParticleField() {
           array={positions}
           itemSize={3}
         />
+        <bufferAttribute
+          attach="attributes-color"
+          count={count}
+          array={colors}
+          itemSize={3}
+        />
       </bufferGeometry>
       <pointsMaterial
-        size={0.02}
-        color="#60a5fa"
+        size={0.03}
+        vertexColors
         transparent
-        opacity={0.6}
+        opacity={0.8}
         sizeAttenuation
       />
     </points>
@@ -76,6 +120,7 @@ function ParticleField() {
 
 function GlowingSphere() {
   const sphereRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   useFrame((state) => {
     if (sphereRef.current) {
@@ -85,15 +130,21 @@ function GlowingSphere() {
 
   return (
     <Float speed={1.5} rotationIntensity={0.2} floatIntensity={1}>
-      <Sphere ref={sphereRef} args={[1.5, 64, 64]} position={[3, 0, -2]}>
+      <Sphere
+        ref={sphereRef}
+        args={[1.5, 64, 64]}
+        position={[3.5, 0, -2]}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
         <MeshDistortMaterial
-          color="#8b5cf6"
+          color={hovered ? '#a78bfa' : '#8b5cf6'}
           speed={1.5}
-          distort={0.4}
+          distort={hovered ? 0.5 : 0.4}
           roughness={0.2}
           metalness={0.9}
           transparent
-          opacity={0.3}
+          opacity={0.4}
         />
       </Sphere>
     </Float>
@@ -102,6 +153,7 @@ function GlowingSphere() {
 
 function TorusKnot() {
   const torusRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   useFrame((state) => {
     if (torusRef.current) {
@@ -112,16 +164,21 @@ function TorusKnot() {
 
   return (
     <Float speed={1} rotationIntensity={0.3} floatIntensity={0.5}>
-      <mesh ref={torusRef} position={[-3, 1, -1]}>
+      <mesh
+        ref={torusRef}
+        position={[-3.5, 1, -1]}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
         <torusKnotGeometry args={[0.8, 0.25, 128, 32]} />
         <MeshDistortMaterial
-          color="#06b6d4"
+          color={hovered ? '#22d3ee' : '#06b6d4'}
           speed={2}
-          distort={0.15}
+          distort={hovered ? 0.25 : 0.15}
           roughness={0.3}
           metalness={0.8}
           transparent
-          opacity={0.5}
+          opacity={0.6}
         />
       </mesh>
     </Float>
@@ -129,21 +186,21 @@ function TorusKnot() {
 }
 
 function MouseFollow() {
-  const { viewport } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
+  const { viewport, pointer } = useThree();
 
-  useFrame((state) => {
+  useFrame(() => {
     if (meshRef.current) {
-      const x = (state.pointer.x * viewport.width) / 2;
-      const y = (state.pointer.y * viewport.height) / 2;
-      meshRef.current.position.x += (x * 0.5 - meshRef.current.position.x) * 0.05;
-      meshRef.current.position.y += (y * 0.5 - meshRef.current.position.y) * 0.05;
+      const targetX = (pointer.x * viewport.width) / 2;
+      const targetY = (pointer.y * viewport.height) / 2;
+      meshRef.current.position.x += (targetX * 0.4 - meshRef.current.position.x) * 0.08;
+      meshRef.current.position.y += (targetY * 0.4 - meshRef.current.position.y) * 0.08;
     }
   });
 
   return (
     <mesh ref={meshRef} position={[0, 0, 0]}>
-      <icosahedronGeometry args={[0.3, 1]} />
+      <icosahedronGeometry args={[0.35, 1]} />
       <MeshDistortMaterial
         color="#f59e0b"
         speed={3}
@@ -155,34 +212,61 @@ function MouseFollow() {
   );
 }
 
+function ScrollReactiveCamera() {
+  const { camera } = useThree();
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useFrame(() => {
+    const targetY = -scrollY * 0.002;
+    camera.position.y += (targetY - camera.position.y) * 0.05;
+  });
+
+  return null;
+}
+
 function Scene() {
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <pointLight position={[10, 10, 10]} intensity={1} />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#3b82f6" />
+      <ambientLight intensity={0.4} />
+      <pointLight position={[10, 10, 10]} intensity={1.2} />
+      <pointLight position={[-10, -10, -10]} intensity={0.6} color="#3b82f6" />
       <spotLight
-        position={[0, 10, 0]}
+        position={[0, 15, 0]}
         angle={0.3}
         penumbra={1}
-        intensity={0.5}
+        intensity={0.8}
         color="#8b5cf6"
+        castShadow
       />
 
-      <FloatingWarehouse position={[-2, -0.5, 0]} />
-      <FloatingWarehouse position={[2, 0.5, -1]} />
+      <FloatingWarehouse position={[-2.5, -0.5, 0]} scale={0.9} />
+      <FloatingWarehouse position={[2.5, 0.5, -1]} scale={1.1} />
       <GlowingSphere />
       <TorusKnot />
       <MouseFollow />
       <ParticleField />
+      <ScrollReactiveCamera />
 
       <OrbitControls
         enableZoom={false}
         enablePan={false}
         autoRotate
-        autoRotateSpeed={0.5}
-        maxPolarAngle={Math.PI / 2}
-        minPolarAngle={Math.PI / 2}
+        autoRotateSpeed={0.3}
+        maxPolarAngle={Math.PI / 1.8}
+        minPolarAngle={Math.PI / 2.5}
+        rotateSpeed={0.5}
+        touches={{
+          ONE: THREE.TOUCH.ROTATE,
+          TWO: undefined as any,
+        }}
       />
     </>
   );
@@ -190,15 +274,32 @@ function Scene() {
 
 export function Hero3D() {
   const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-background via-background to-primary/5" />
+    );
+  }
 
   return (
     <Canvas
       camera={{ position: [0, 0, 8], fov: 50 }}
-      style={{ background: 'transparent' }}
+      style={{ background: 'transparent', touchAction: 'pan-y' }}
       dpr={[1, 2]}
+      gl={{
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      }}
+      performance={{ min: 0.5 }}
     >
-      <color attach="background" args={[resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff']} />
-      <fog attach="fog" args={[resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff', 5, 15]} />
+      <color attach="background" args={[resolvedTheme === 'dark' ? '#0a0a0a' : '#f8fafc']} />
+      <fog attach="fog" args={[resolvedTheme === 'dark' ? '#0a0a0a' : '#f8fafc', 8, 20]} />
       <Scene />
     </Canvas>
   );

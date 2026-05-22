@@ -12,30 +12,33 @@ const publicPaths = [
   '/api/webhooks',
 ];
 
+const staticPaths = [
+  '/_next',
+  '/api/auth',
+  '/favicon.ico',
+  '/manifest.json',
+];
+
 const isPublicPath = (pathname: string) => {
   return publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/'));
+};
+
+const isStaticPath = (pathname: string) => {
+  return staticPaths.some((path) => pathname.startsWith(path)) || pathname.includes('.');
 };
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths
-  if (isPublicPath(pathname)) {
+  // Allow static files and public paths
+  if (isStaticPath(pathname) || isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Allow static files
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.includes('.')
-  ) {
-    return NextResponse.next();
-  }
-
+  // Check for auth token
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-development-only',
   });
 
   // Redirect to login if not authenticated
@@ -45,21 +48,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Locale detection
-  const acceptLanguage = request.headers.get('accept-language');
-  const locale = acceptLanguage?.includes('ar') ? 'ar' : 'en';
+  // Get locale from cookie or accept-language header
+  const locale = request.cookies.get('NEXT_LOCALE')?.value ||
+    (request.headers.get('accept-language')?.includes('ar') ? 'ar' : 'en');
   const direction = locale === 'ar' ? 'rtl' : 'ltr';
 
-  // Add locale headers for downstream use
+  // Add locale and user headers for downstream use
   const response = NextResponse.next();
   response.headers.set('x-locale', locale);
   response.headers.set('x-direction', direction);
+  response.headers.set('x-user-id', token.id as string || '');
 
   return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.).*)',
   ],
 };
